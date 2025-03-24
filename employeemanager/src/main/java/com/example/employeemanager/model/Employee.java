@@ -17,17 +17,18 @@ public class Employee implements Serializable {
     private String imageUrl;
     @Column(nullable = false, updatable = false)
     private String employeeCode;
-
+    private String status;
 
     public Employee() {}
 
-    public Employee(String name, String email,String jobTitle, String phone, String imageUrl, String employeeCode) {
+    public Employee(String name, String email,String jobTitle, String phone, String imageUrl, String employeeCode, String status) {
         this.name= name;
         this.email= email;
         this.jobTitle= jobTitle;
         this.phone= phone;
         this.imageUrl= imageUrl;
         this.employeeCode= employeeCode;
+        this.status= status;
     }
 
     public Long getId() {
@@ -71,6 +72,9 @@ public class Employee implements Serializable {
     public void setEmployeeCode(String employeeCode) {
         this.employeeCode = employeeCode;
     }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
 
     @Override
     public String toString() {
@@ -83,4 +87,6 @@ public class Employee implements Serializable {
                 ", imageUrl='" + imageUrl + '\'' +
                 '}';
     }
+
+
 }

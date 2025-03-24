@@ -26,6 +26,12 @@ public class EmployeeResource {
         Employee employee = employeeService.findEmployeeById(id);
         return new ResponseEntity<>(employee, HttpStatus.OK);
     }
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<Employee>> getEmployeesByStatus(@PathVariable("status") String status) {
+        List<Employee> employees = employeeService.findEmployeesByStatus(status);
+        return new ResponseEntity<>(employees, HttpStatus.OK);
+    }
+
     @PostMapping("/add")
     public ResponseEntity<Employee> addEmployee(@RequestBody Employee employee) {
         Employee newEmployee = employeeService.addEmployee(employee);
