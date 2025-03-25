@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { Employee } from './employee';
+import { Employee } from '../app/employees/employee.model';
 import { EmployeeService } from '../app/employees/employee.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
@@ -27,7 +27,7 @@ export class AppComponent implements OnInit {
   }
 
   public getEmployees(): void {
-    this.employeeService.getEmployees().subscribe(
+    this.employeeService.getAllEmployees().subscribe(
       (response: Employee[]) => {
         this.employees = response;
         this.filteredEmployees = response;

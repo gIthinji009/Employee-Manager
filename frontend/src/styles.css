@@ -2,9 +2,6 @@
 @import 'https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css';
 @import 'https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 body {
   background: #f5f5f5;

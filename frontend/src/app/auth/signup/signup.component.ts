@@ -1,39 +1,33 @@
 import { Component } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { Router } from '@angular/router';
 
 @Component({
+  standalone: true,
+  imports: [FormsModule, CommonModule, RouterModule],
   selector: 'app-signup',
   templateUrl: './signup.component.html',
   styleUrls: ['./signup.component.css']
 })
 export class SignupComponent {
-  signupForm: FormGroup;
+  user = { username: '', password: '', role: 'USER' };
   isLoading = false;
   errorMessage = '';
 
-  constructor(
-    private fb: FormBuilder,
-    private authService: AuthService,
-    private router: Router
-  ) {
-    this.signupForm = this.fb.group({
-      username: ['', [Validators.required, Validators.minLength(4)]],
-      password: ['', [Validators.required, Validators.minLength(6)]],
-      role: ['USER']
-    });
-  }
+  constructor(private authService: AuthService, private router: Router) {}
 
-  onSubmit() {
-    if (this.signupForm.valid) {
+  onSubmit(form: any) {
+    if (form.valid) {
       this.isLoading = true;
-      this.authService.signUp(this.signupForm.value).subscribe({
+      this.authService.signUp(this.user).subscribe({
         next: () => {
           this.router.navigate(['/login']);
         },
         error: (err) => {
-          this.errorMessage = err.error.message || 'Signup failed';
+          this.errorMessage = err.error?.message || 'Signup failed';
           this.isLoading = false;
         },
         complete: () => this.isLoading = false

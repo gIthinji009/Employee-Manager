@@ -1,26 +1,66 @@
-<h2>Employee List</h2>
-<select [(ngModel)]="statusFilter" (change)="fetchEmployees()">
-  <option value="pending">Pending Verification</option>
-  <option value="verified">Verified</option>
-</select>
-
-<table>
-  <tr>
-    <th>Name</th>
-    <th>Position</th>
-    <th>Department</th>
-    <th>Status</th>
-    <th>Actions</th>
-  </tr>
-  <tr *ngFor="let emp of employees">
-    <td>{{ emp.name }}</td>
-    <td>{{ emp.position }}</td>
-    <td>{{ emp.department }}</td>
-    <td>{{ emp.status }}</td>
-    <td>
-      <button *ngIf="emp.status === 'pending'" (click)="verifyEmployee(emp.id)">Verify</button>
-      <button *ngIf="emp.status === 'pending'" (click)="deleteEmployee(emp.id)">Delete</button>
-      <span *ngIf="emp.status === 'verified'">🔒</span>
-    </td>
-  </tr>
-</table>
+<div class="employee-list">
+    <div class="header">
+      <h2>Employee List</h2>
+      <div class="filter-control">
+        <label for="statusFilter">Filter by status:</label>
+        <select id="statusFilter" [(ngModel)]="statusFilter" (change)="loadEmployees()">
+          <option value="all">All Employees</option>
+          <option value="pending">Pending Verification</option>
+          <option value="verified">Verified</option>
+        </select>
+      </div>
+      <a routerLink="/employees/add" class="add-button">Add Employee</a>
+    </div>
+  
+    <div *ngIf="isLoading" class="loading-message">
+      Loading employees...
+    </div>
+  
+    <div *ngIf="!isLoading">
+      <table class="employee-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Job Title</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let emp of filteredEmployees">
+            <td>{{ emp.name }}</td>
+            <td>{{ emp.jobTitle || 'N/A' }}</td>
+            <td>{{ emp.email || 'N/A' }}</td>
+            <td>{{ emp.phone || 'N/A' }}</td>
+            <td>
+              <span [class]="'status-badge ' + emp.status">
+                {{ emp.status }}
+              </span>
+            </td>
+            <td class="actions">
+              <button 
+                *ngIf="emp.id !== undefined && emp.id !== null"
+                [routerLink]="['/employees/edit', emp.id]" 
+                class="edit-btn">
+                Edit
+              </button>
+              <button 
+                *ngIf="emp.id !== undefined && emp.id !== null"
+                (click)="deleteEmployee(emp.id!)" 
+                class="delete-btn">
+                Delete
+              </button>
+              <span *ngIf="emp.id === undefined || emp.id === null" class="id-warning">
+                No ID
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="filteredEmployees.length === 0">
+            <td colspan="6" class="no-records">No employees found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>

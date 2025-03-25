@@ -1,0 +1,8 @@
+<form #loginForm="ngForm" (ngSubmit)="onSubmit(loginForm)">
+    <input name="username" [(ngModel)]="credentials.username" required>
+    <input name="password" type="password" [(ngModel)]="credentials.password" required>
+    <button type="submit" [disabled]="loginForm.invalid || isLoading">
+      {{ isLoading ? 'Logging in...' : 'Login' }}
+    </button>
+    <div *ngIf="errorMessage" class="error">{{ errorMessage }}</div>
+  </form>
