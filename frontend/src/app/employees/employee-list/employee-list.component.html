@@ -1,0 +1,26 @@
+<h2>Employee List</h2>
+<select [(ngModel)]="statusFilter" (change)="fetchEmployees()">
+  <option value="pending">Pending Verification</option>
+  <option value="verified">Verified</option>
+</select>
+
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Position</th>
+    <th>Department</th>
+    <th>Status</th>
+    <th>Actions</th>
+  </tr>
+  <tr *ngFor="let emp of employees">
+    <td>{{ emp.name }}</td>
+    <td>{{ emp.position }}</td>
+    <td>{{ emp.department }}</td>
+    <td>{{ emp.status }}</td>
+    <td>
+      <button *ngIf="emp.status === 'pending'" (click)="verifyEmployee(emp.id)">Verify</button>
+      <button *ngIf="emp.status === 'pending'" (click)="deleteEmployee(emp.id)">Delete</button>
+      <span *ngIf="emp.status === 'verified'">🔒</span>
+    </td>
+  </tr>
+</table>

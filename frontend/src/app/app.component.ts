@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { Employee } from './employee';
-import { EmployeeService } from './employee.service';
+import { EmployeeService } from '../app/employees/employee.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
@@ -13,6 +13,7 @@ import { FormsModule, NgForm } from '@angular/forms';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent implements OnInit {
+  title = 'Employee Management System';
   public employees: Employee[] = [];
   public filteredEmployees: Employee[] = [];
   public editEmployee: Employee | null = null;
