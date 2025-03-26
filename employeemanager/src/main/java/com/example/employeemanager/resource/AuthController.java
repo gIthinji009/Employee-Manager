@@ -1,8 +1,17 @@
 package com.example.employeemanager.resource;
 
+import com.example.employeemanager.dto.LoginRequest;
+import com.example.employeemanager.dto.RegisterRequest;
 import com.example.employeemanager.model.User;
 import com.example.employeemanager.repo.UserRepo;
 import com.example.employeemanager.security.JwtUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -11,16 +20,20 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
+@Tag(name = "Authentication", description = "User authentication and registration endpoints")
 public class AuthController {
     private final UserRepo userRepo;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
-
 
     public AuthController(UserRepo userRepo, PasswordEncoder passwordEncoder,
                           AuthenticationManager authenticationManager, JwtUtil jwtUtil,
@@ -32,17 +45,70 @@ public class AuthController {
         this.userDetailsService = userDetailsService;
     }
 
+    @Operation(summary = "Register a new user", description = "Creates a new user account")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "User registered successfully",
+                    content = @Content(schema = @Schema(implementation = Map.class),
+                            examples = @ExampleObject(value = "{\"message\": \"User registered successfully\", \"username\": \"testuser\"}"))),
+            @ApiResponse(responseCode = "400", description = "Bad request - validation failed")
+    })
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody User user) {
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+    public ResponseEntity<Map<String, String>> register(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "User registration details",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = RegisterRequest.class))
+            )
+            @Valid @RequestBody RegisterRequest registerRequest) {
+
+        if (userRepo.findByUsername(registerRequest.getUsername()).isPresent()) {
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Username already exists");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        User user = new User();
+        user.setUsername(registerRequest.getUsername());
+        user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
+        user.setRole(registerRequest.getRole() != null ? registerRequest.getRole() : "USER");
+
         userRepo.save(user);
-        return ResponseEntity.ok("User registered successfully");
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "User registered successfully");
+        response.put("username", user.getUsername());
+        return ResponseEntity.ok(response);
     }
+
+    @Operation(summary = "Authenticate user", description = "Logs in a user and returns JWT token")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Authentication successful",
+                    content = @Content(schema = @Schema(implementation = Map.class),
+                            examples = @ExampleObject(value = "{\"token\": \"eyJhbGciOiJIUzI1NiJ9...\", \"username\": \"testuser\"}"))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid credentials")
+    })
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody User user) {
-        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword()));
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
+    public ResponseEntity<Map<String, String>> login(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "User credentials",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = LoginRequest.class))
+            )
+            @Valid @RequestBody LoginRequest loginRequest) {
+
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginRequest.getUsername(),
+                        loginRequest.getPassword()
+                )
+        );
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.getUsername());
         String token = jwtUtil.generateToken(userDetails);
-        return ResponseEntity.ok(token);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("token", token);
+        response.put("username", userDetails.getUsername());
+        return ResponseEntity.ok(response);
     }
 }
