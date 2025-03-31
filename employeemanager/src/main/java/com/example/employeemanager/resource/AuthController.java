@@ -4,7 +4,7 @@ import com.example.employeemanager.dto.LoginRequest;
 import com.example.employeemanager.dto.RegisterRequest;
 import com.example.employeemanager.model.User;
 import com.example.employeemanager.repo.UserRepo;
-import com.example.employeemanager.security.JwtUtil;
+import com.example.employeemanager.jwt.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -14,14 +14,16 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -88,27 +90,34 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Unauthorized - invalid credentials")
     })
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> login(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "User credentials",
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = LoginRequest.class))
-            )
-            @Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
+        try {
+            // 1. Authenticate
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getUsername(),
+                            loginRequest.getPassword()
+                    )
+            );
 
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getUsername(),
-                        loginRequest.getPassword()
-                )
-        );
+            // 2. Generate token
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            String token = jwtUtil.generateToken(userDetails);
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.getUsername());
-        String token = jwtUtil.generateToken(userDetails);
+            // 3. Return response
+            Map<String, String> response = new HashMap<>();
+            response.put("token", token);
+            response.put("username", userDetails.getUsername());
+            return ResponseEntity.ok(response);
 
-        Map<String, String> response = new HashMap<>();
-        response.put("token", token);
-        response.put("username", userDetails.getUsername());
-        return ResponseEntity.ok(response);
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(401).body(Map.of("error", "Invalid credentials"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "Authentication failed",
+                    "message", e.getMessage()
+            ));
+        }
     }
 }

@@ -4,6 +4,8 @@ import { EmployeeService } from '../app/employees/employee.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
+import { AuthService } from './auth/auth.service';
+
 
 @Component({
   selector: 'app-root',
@@ -20,7 +22,9 @@ export class AppComponent implements OnInit {
   public deleteEmployee: Employee | null = null;
   public searchKey: string = '';
 
-  constructor(private employeeService: EmployeeService) {}
+  constructor(private employeeService: EmployeeService
+    , private authService: AuthService  // Added authService for authentication
+  ) {}
 
   ngOnInit(): void {
     this.getEmployees();

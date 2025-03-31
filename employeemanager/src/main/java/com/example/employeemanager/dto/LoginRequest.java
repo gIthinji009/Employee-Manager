@@ -13,5 +13,6 @@ public class LoginRequest {
 
     @Schema(example = "admin123", required = true)
     @NotBlank(message = "Password is required")
+
     private String password;
 }

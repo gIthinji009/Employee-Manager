@@ -9,7 +9,7 @@ import { Router } from '@angular/router';
 export class AuthService {
   private apiUrl = 'http://localhost:8080/auth';
   private loggedIn = new BehaviorSubject<boolean>(!!this.getToken());
-
+ 
   constructor(private http: HttpClient, private router: Router) {}
 
   // Alias for register to match component

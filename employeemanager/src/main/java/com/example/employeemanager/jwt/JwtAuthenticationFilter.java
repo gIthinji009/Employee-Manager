@@ -1,4 +1,4 @@
-package com.example.employeemanager.security;
+package com.example.employeemanager.jwt;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

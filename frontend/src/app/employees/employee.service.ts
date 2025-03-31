@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Employee } from '../employees/employee.model';
 
@@ -8,9 +8,16 @@ import { Employee } from '../employees/employee.model';
 })
 export class EmployeeService {
   private apiUrl = 'http://localhost:8080/employee';
+  private token = localStorage.getItem('token');
 
   constructor(private http: HttpClient) {}
 
+  private getHeaders(): HttpHeaders {
+    return new HttpHeaders({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.token}`
+    });
+  }
   getAllEmployees(): Observable<Employee[]> {
     return this.http.get<Employee[]>(`${this.apiUrl}/all`);
   }
