@@ -1,3 +1,4 @@
+// src/app/app-routing.module.ts
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { LoginComponent } from './auth/login/login.component';
@@ -5,6 +6,8 @@ import { SignupComponent } from './auth/signup/signup.component';
 import { EmployeeListComponent } from './employees/employee-list/employee-list.component';
 import { EmployeeFormComponent } from './employees/employee-form/employee-form.component';
 import { AuthGuard } from './shared/auth.guard';
+import { RoleGuard } from './shared/role.guard';
+import { UnauthorizedComponent } from './shared/unauthorized/unauthorized.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -12,18 +15,23 @@ export const routes: Routes = [
   { 
     path: 'employees', 
     component: EmployeeListComponent,
-    canActivate: [AuthGuard] 
+    canActivate: [AuthGuard],
+    data: { roles: ['USER', 'MANAGER', 'ADMIN'] }
   },
   { 
     path: 'employees/add', 
     component: EmployeeFormComponent,
-    canActivate: [AuthGuard] 
+    canActivate: [AuthGuard, RoleGuard],
+    data: { roles: ['MANAGER', 'ADMIN'] }
   },
   { 
     path: 'employees/edit/:id', 
     component: EmployeeFormComponent,
-    canActivate: [AuthGuard] 
+    canActivate: [AuthGuard, RoleGuard],
+    data: { roles: ['MANAGER', 'ADMIN'] }
   },
+ 
+  { path: 'unauthorized', component: UnauthorizedComponent },
   { path: '', redirectTo: '/employees', pathMatch: 'full' },
   { path: '**', redirectTo: '/employees' }
 ];
