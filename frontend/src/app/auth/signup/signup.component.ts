@@ -1,9 +1,11 @@
 import { Component } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
+import { AuthResponse } from '../auth-response.interface';
 
 @Component({
   standalone: true,
@@ -19,18 +21,29 @@ export class SignupComponent {
 
   constructor(private authService: AuthService, private router: Router) {}
 
-  onSubmit(form: any) {
+  onSubmit(form: NgForm) {
     if (form.valid) {
       this.isLoading = true;
+      this.errorMessage = '';
+      
       this.authService.signUp(this.user).subscribe({
-        next: () => {
-          this.router.navigate(['/login']);
+        next: (res: AuthResponse) => {
+          // Optionally auto-login after signup
+          // this.authService.storeToken(res.token);
+          // this.router.navigate(['/employees']);
+          
+          // Or redirect to login page
+          this.router.navigate(['/login'], { 
+            queryParams: { registered: 'true' } 
+          });
         },
-        error: (err) => {
-          this.errorMessage = err.error?.message || 'Signup failed';
+        error: (err: HttpErrorResponse) => {
+          this.errorMessage = err.error?.message || 'Registration failed. Please try again.';
           this.isLoading = false;
         },
-        complete: () => this.isLoading = false
+        complete: () => {
+          this.isLoading = false;
+        }
       });
     }
   }

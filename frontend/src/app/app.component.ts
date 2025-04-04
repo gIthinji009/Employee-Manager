@@ -6,7 +6,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { AuthService } from './auth/auth.service';
 
-
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -21,65 +20,102 @@ export class AppComponent implements OnInit {
   public editEmployee: Employee | null = null;
   public deleteEmployee: Employee | null = null;
   public searchKey: string = '';
+  public isLoading = true;
+  public errorMessage: string | null = null;
 
-  constructor(private employeeService: EmployeeService
-    , private authService: AuthService  // Added authService for authentication
+  constructor(
+    private employeeService: EmployeeService,
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
-    this.getEmployees();
+    this.checkAuthAndLoadData();
   }
 
-  public getEmployees(): void {
-    this.employeeService.getAllEmployees().subscribe(
-      (response: Employee[]) => {
-        this.employees = response;
-        this.filteredEmployees = response;
+  private checkAuthAndLoadData(): void {
+    if (!this.authService.isLoggedIn()) {
+      this.authService.redirectToLogin();
+      return;
+    }
+    this.loadEmployees();
+  }
+
+  private loadEmployees(): void {
+    this.isLoading = true;
+    this.errorMessage = null;
+    
+    this.employeeService.getAllEmployees().subscribe({
+      next: (employees: Employee[]) => {
+        this.employees = employees;
+        this.filteredEmployees = [...employees];
+        this.isLoading = false;
+        
+        if (employees.length === 0) {
+          this.errorMessage = 'The employee database is currently empty.';
+        }
       },
-      (error: HttpErrorResponse) => {
-        alert(error.message);
+      error: (error: Error) => {
+        this.errorMessage = error.message;
+        this.isLoading = false;
+        console.error('Error loading employees:', error);
       }
-    );
+    });
   }
 
   public onAddEmployee(addForm: NgForm): void {
-    document.getElementById('add-employee-form')?.click();
-    this.employeeService.addEmployee(addForm.value).subscribe(
-      (response: Employee) => {
-        this.getEmployees();
+    if (addForm.invalid) return;
+
+    this.isLoading = true;
+    this.errorMessage = null;
+    
+    this.employeeService.addEmployee(addForm.value).subscribe({
+      next: () => {
+        this.loadEmployees();
         addForm.reset();
+        this.closeModal('addEmployeeModal');
       },
-      (error: HttpErrorResponse) => {
-        alert(error.message);
-        addForm.reset();
+      error: (error: Error) => {
+        this.errorMessage = error.message;
+        this.isLoading = false;
       }
-    );
+    });
   }
 
   public onUpdateEmployee(employee: Employee): void {
-    this.employeeService.updateEmployee(employee).subscribe(
-      (response: Employee) => {
-        this.getEmployees();
+    this.isLoading = true;
+    this.errorMessage = null;
+    
+    this.employeeService.updateEmployee(employee).subscribe({
+      next: () => {
+        this.loadEmployees();
+        this.closeModal('updateEmployeeModal');
       },
-      (error: HttpErrorResponse) => {
-        alert(error.message);
+      error: (error: Error) => {
+        this.errorMessage = error.message;
+        this.isLoading = false;
       }
-    );
+    });
   }
 
   public onDeleteEmployee(employeeId: number | undefined): void {
     if (employeeId === undefined) {
-      alert("Error: Employee ID is missing.");
+      this.errorMessage = "Error: Employee ID is missing.";
       return;
     }
-    this.employeeService.deleteEmployee(employeeId).subscribe(
-      () => {
-        this.getEmployees();
+
+    this.isLoading = true;
+    this.errorMessage = null;
+    
+    this.employeeService.deleteEmployee(employeeId).subscribe({
+      next: () => {
+        this.loadEmployees();
+        this.closeModal('deleteEmployeeModal');
       },
-      (error: HttpErrorResponse) => {
-        alert(error.message);
+      error: (error: Error) => {
+        this.errorMessage = error.message;
+        this.isLoading = false;
       }
-    );
+    });
   }
 
   public searchEmployees(): void {
@@ -87,12 +123,28 @@ export class AppComponent implements OnInit {
       this.filteredEmployees = [...this.employees];
       return;
     }
-    this.filteredEmployees = this.employees.filter(employee =>
-      employee.name.toLowerCase().includes(this.searchKey.toLowerCase()) ||
-      employee.email.toLowerCase().includes(this.searchKey.toLowerCase()) ||
-      employee.phone.toLowerCase().includes(this.searchKey.toLowerCase()) ||
-      employee.jobTitle.toLowerCase().includes(this.searchKey.toLowerCase())
-    );
+    
+    const searchTerm = this.searchKey.toLowerCase();
+    this.filteredEmployees = this.employees.filter(employee => {
+      return (
+        (employee.name?.toLowerCase().includes(searchTerm)) ||
+        (employee.email?.toLowerCase().includes(searchTerm)) ||
+        (employee.phone?.toLowerCase().includes(searchTerm)) ||
+        (employee.jobTitle?.toLowerCase().includes(searchTerm))
+      );
+    });
+  }
+
+  private closeModal(modalId: string): void {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.style.display = 'none';
+      document.body.classList.remove('modal-open');
+      const modalBackdrop = document.querySelector('.modal-backdrop');
+      if (modalBackdrop) {
+        modalBackdrop.remove();
+      }
+    }
   }
 
   public onOpenModal(employee: Employee | null, mode: string): void {
