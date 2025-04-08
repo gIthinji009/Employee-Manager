@@ -2,17 +2,26 @@ package com.example.employeemanager.jwt;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
-
 import java.security.Key;
 import java.util.Date;
 import java.util.function.Function;
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class JwtUtil {
-    private static final Key SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256); // Secure key
-    public static final long EXPIRATION_TIME = 864_000_000; // 10 days
+    private final Key SECRET_KEY;
+    private final long EXPIRATION_TIME;
+
+    public JwtUtil(
+            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.expiration}") long expirationTime) {
+        this.SECRET_KEY = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        this.EXPIRATION_TIME = expirationTime;
+    }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -22,10 +31,11 @@ public class JwtUtil {
         return extractClaim(token, Claims::getExpiration);
     }
 
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+    private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
     }
+
 
     private Claims extractAllClaims(String token) {
         try {
@@ -34,27 +44,32 @@ public class JwtUtil {
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
-        } catch (MalformedJwtException e) {
-            throw new RuntimeException("Invalid JWT token format");
         } catch (ExpiredJwtException e) {
-            throw new RuntimeException("Expired JWT token");
+            throw new JwtException("Expired JWT token");
         } catch (UnsupportedJwtException e) {
-            throw new RuntimeException("Unsupported JWT token");
+            throw new JwtException("Unsupported JWT token");
+        } catch (MalformedJwtException e) {
+            throw new JwtException("Invalid JWT token format");
+        } catch (SignatureException e) {
+            throw new JwtException("Invalid JWT signature");
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("JWT token is empty or invalid");
+            throw new JwtException("JWT token is empty or invalid");
         }
     }
 
-    public boolean validateToken(String token, UserDetails userDetails) {
+    public boolean validateToken(String token) {
         try {
-            String username = extractUsername(token);
-            return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+            Jwts.parserBuilder()
+                    .setSigningKey(SECRET_KEY)
+                    .build()
+                    .parseClaimsJws(token);
+            return !isTokenExpired(token);
         } catch (Exception e) {
-            return false; // Avoid exposing token validation details
+            return false;
         }
     }
 
-    private boolean isTokenExpired(String token) {
+    public boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
 

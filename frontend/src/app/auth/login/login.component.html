@@ -16,10 +16,10 @@
       <input type="password" id="password" name="password" [(ngModel)]="credentials.password" required>
     </div>
 
-    <button type="submit" [disabled]="isLoading">
-      <span *ngIf="!isLoading">Login</span>
-      <span *ngIf="isLoading">Logging in...</span>
-    </button>
+    <button type="submit" >Login</button>
+    <p>
+      Forgot your password? <a routerLink="/forgot-password">Reset password</a>
+    </p>
 
     <p class="register-link">
       Don't have an account? <a routerLink="/signup">Register here</a>

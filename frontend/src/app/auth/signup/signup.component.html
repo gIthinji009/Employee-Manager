@@ -1,4 +1,4 @@
-<div class="auth-container">
+ <div class="auth-container">
   <h2>Register</h2>
   
   <div *ngIf="errorMessage" class="alert alert-danger">
@@ -24,13 +24,11 @@
       </select>
     </div>
 
-    <button type="submit" [disabled]="isLoading">
-      <span *ngIf="!isLoading">Register</span>
-      <span *ngIf="isLoading">Registering...</span>
-    </button>
+    <button type="submit" >signup</button>
 
     <p class="login-link">
       Already have an account? <a routerLink="/login">Login here</a>
     </p>
   </form>
 </div>
+

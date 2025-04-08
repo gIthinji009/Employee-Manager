@@ -10,6 +10,7 @@ import { RoleGuard } from './shared/role.guard';
 import { UnauthorizedComponent } from './shared/unauthorized/unauthorized.component';
 
 export const routes: Routes = [
+  {path: '', redirectTo: 'login',pathMatch: 'full'},
   { path: 'login', component: LoginComponent },
   { path: 'signup', component: SignupComponent },
   { 

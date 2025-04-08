@@ -1,170 +1,178 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, throwError } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { BehaviorSubject, Observable, throwError, combineLatest, of } from 'rxjs';
+import { catchError, tap, finalize, map } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { JwtHelperService } from '@auth0/angular-jwt';
+
+export interface AuthResponse {
+  token: string;
+  refreshToken?: string;
+  username?: string;
+  roles?: string[];
+  message?: string;
+  expiresIn?: number;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   private apiUrl = 'http://localhost:8080/api/auth';
-  private loggedIn = new BehaviorSubject<boolean>(this.checkInitialLogin());
-  private currentUserRoles = new BehaviorSubject<string[]>(this.getUserRolesFromToken());
-  private currentUsername = new BehaviorSubject<string>(this.getUsernameFromToken());
+  private authStatus = new BehaviorSubject<boolean>(false);
+  private loadingSubject = new BehaviorSubject<boolean>(false);
+  private currentRolesSubject = new BehaviorSubject<string[]>([]);
 
   constructor(
-    private http: HttpClient, 
-    private router: Router, 
+    private http: HttpClient,
+    private router: Router,
     private jwtHelper: JwtHelperService
-  ) {}
+  ) {this.authStatus.next(this.checkInitialLogin());}
 
-  // Public methods
-  login(credentials: {username: string, password: string}): Observable<any> {
-    return this.http.post(`${this.apiUrl}/login`, credentials).pipe(
-      tap((response: any) => {
-        this.storeAuthData(response);
-        this.updateAuthState();
-      }),
-      catchError(error => {
-        this.clearAuthData();
-        return throwError(() => this.handleAuthError(error));
-      })
+  // Public properties
+  public currentRoles$ = this.currentRolesSubject.asObservable();
+  public get currentRoles(): string[] {
+    return this.currentRolesSubject.value;
+  }
+
+  // Authentication methods
+  login(credentials: {username: string, password: string}): Observable<AuthResponse> {
+    this.setLoading(true);
+    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, credentials).pipe(
+      tap(response => this.handleAuthSuccess(response)),
+      catchError(error => this.handleAuthError(error)),
+      finalize(() => this.setLoading(false))
     );
   }
 
-  register(user: {username: string, password: string, role?: string}): Observable<any> {
-    const userWithRole = { ...user, role: user.role || 'USER' };
-    return this.http.post(`${this.apiUrl}/register`, userWithRole).pipe(
-      catchError(error => throwError(() => this.handleAuthError(error)))
+  register(userData: {username: string, password: string, role?: string}): Observable<AuthResponse> {
+    this.setLoading(true);
+    const payload = { ...userData, role: userData.role || 'USER' };
+    return this.http.post<AuthResponse>(`${this.apiUrl}/register`, payload).pipe(
+      tap(response => this.handleAuthSuccess(response)),
+      catchError(error => this.handleAuthError(error)),
+      finalize(() => this.setLoading(false))
     );
   }
-  signIn(credentials: {username: string, password: string}): Observable<any> {
-    return this.login(credentials); // Alias for login
-  }
 
-  signUp(user: {username: string, password: string, role?: string}): Observable<any> {
-    return this.register(user); // Alias for register
-  }
   logout(): void {
     this.clearAuthData();
     this.router.navigate(['/login']);
   }
-  storeToken(token: string): void {
-    localStorage.setItem('token', token);
-    this.loggedIn.next(true);
-    this.updateAuthState();
+
+  isLoggedIn(): boolean {
+    return this.authStatus.value && !this.isTokenExpired();
   }
-  refreshToken(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/refresh`, { 
-      token: this.getToken() 
-    }).pipe(
-      tap((response: any) => {
-        this.storeAuthData(response);
-      }),
-      catchError(error => {
-        this.clearAuthData();
-        return throwError(() => this.handleAuthError(error));
-      })
+  
+  redirectToLogin(): void {
+    this.router.navigate(['/login'], {
+      queryParams: { reason: 'not-logged-in' }
+    });
+  }
+  
+  refreshToken(): Observable<AuthResponse> {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      this.clearAuthData();
+      return throwError(() => new Error('No refresh token found'));
+    }
+  
+    this.setLoading(true);
+    return this.http.post<AuthResponse>(`${this.apiUrl}/refresh`, { refreshToken }).pipe(
+      tap(response => this.handleAuthSuccess(response)),
+      catchError(error => this.handleAuthError(error)),
+      finalize(() => this.setLoading(false))
     );
   }
-  isLoggedIn(): boolean {
-    return this.checkInitialLogin();
+  
+  signUp(userData: {username: string, password: string, role?: string}): Observable<AuthResponse> {
+    return this.register(userData);
+  }
+  
+
+  // Token management
+  storeToken(token: string): void {
+    if (!token || this.isTokenExpired(token)) {
+      this.clearAuthData();
+      return;
+    }
+    localStorage.setItem('token', token);
+    this.decodeAndStoreTokenData(token);
+    this.authStatus.next(true);
   }
 
-  redirectToLogin(): void {
-    this.router.navigate(['/login']);
-  }
-
-  isTokenExpired(token?: string): boolean {
-    const tokenToCheck = token || this.getToken();
-    if (!tokenToCheck) return true;
-    return this.jwtHelper.isTokenExpired(tokenToCheck);
-  }
-
-  // Getters
   getToken(): string | null {
     return localStorage.getItem('token');
   }
 
-  get isLoggedIn$(): Observable<boolean> {
-    return this.loggedIn.asObservable();
+  isTokenExpired(token?: string): boolean {
+    const tokenToCheck = token || this.getToken();
+    return !tokenToCheck || this.jwtHelper.isTokenExpired(tokenToCheck);
   }
 
-  get userRoles$(): Observable<string[]> {
-    return this.currentUserRoles.asObservable();
+  // Role checking
+  hasRole(requiredRole: string): boolean {
+    return this.currentRoles.includes(requiredRole);
   }
 
-  get username$(): Observable<string> {
-    return this.currentUsername.asObservable();
+  // Status observables
+  get isLoading$(): Observable<boolean> {
+    return this.loadingSubject.asObservable();
   }
 
-  hasRole(role: string): boolean {
-    return this.currentUserRoles.value.includes(role);
+  get isAuthenticated$(): Observable<boolean> {
+    return combineLatest([this.authStatus, this.currentRoles$]).pipe(
+      map(([isLoggedIn, roles]) => isLoggedIn && roles.length > 0)
+    );
   }
 
   // Private helper methods
   private checkInitialLogin(): boolean {
     const token = this.getToken();
-    return !!token && !this.jwtHelper.isTokenExpired(token);
+    return !!token && !this.isTokenExpired(token);
   }
 
-  private storeAuthData(response: any): void {
-    localStorage.setItem('token', response.token);
-    if (response.refreshToken) {
-      localStorage.setItem('refreshToken', response.refreshToken);
+  private decodeAndStoreTokenData(token: string): void {
+    try {
+      const decoded = this.jwtHelper.decodeToken(token);
+      const roles = decoded?.roles || [];
+      this.currentRolesSubject.next(Array.isArray(roles) ? roles : [roles]);
+    } catch (e) {
+      console.error('Token decoding error', e);
+      this.currentRolesSubject.next([]);
     }
   }
 
   private clearAuthData(): void {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
-    this.loggedIn.next(false);
-    this.currentUserRoles.next([]);
-    this.currentUsername.next('');
+    this.authStatus.next(false);
+    this.currentRolesSubject.next([]);
   }
 
-  private updateAuthState(): void {
-    this.loggedIn.next(true);
-    this.currentUserRoles.next(this.getUserRolesFromToken());
-    this.currentUsername.next(this.getUsernameFromToken());
-  }
-
-  private getUserRolesFromToken(): string[] {
-    const token = this.getToken();
-    if (!token) return [];
-    
-    try {
-      const decoded = this.jwtHelper.decodeToken(token);
-      return decoded.roles || [];
-    } catch (e) {
-      console.error('Token decoding error', e);
-      return [];
+  private handleAuthSuccess(response: AuthResponse): void {
+    this.storeToken(response.token);
+    if (response.refreshToken) {
+      localStorage.setItem('refreshToken', response.refreshToken);
     }
   }
 
-  private getUsernameFromToken(): string {
-    const token = this.getToken();
-    if (!token) return '';
-    
-    try {
-      const decoded = this.jwtHelper.decodeToken(token);
-      return decoded.sub || decoded.username || '';
-    } catch (e) {
-      console.error('Token decoding error', e);
-      return '';
+  private handleAuthError(error: HttpErrorResponse): Observable<never> {
+    let errorMessage = 'Authentication failed';
+    if (error.status === 0) {
+      errorMessage = 'Unable to connect to server';
+    } else if (error.status === 401) {
+      errorMessage = 'Invalid credentials';
+    } else if (error.status === 403) {
+      errorMessage = 'Access denied';
+    } else if (error.error?.message) {
+      errorMessage = error.error.message;
     }
+    this.clearAuthData();
+    return throwError(() => new Error(errorMessage));
   }
 
-  private handleAuthError(error: any): Error {
-    // Custom error handling logic
-    if (error.status === 401) {
-      return new Error('Invalid credentials');
-    }
-    if (error.status === 403) {
-      return new Error('Access denied');
-    }
-    return new Error('Authentication failed. Please try again.');
+  private setLoading(isLoading: boolean): void {
+    this.loadingSubject.next(isLoading);
   }
 }

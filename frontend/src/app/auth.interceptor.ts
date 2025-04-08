@@ -10,6 +10,7 @@ import { Observable, throwError } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
 import { AuthService } from '../app/auth/auth.service';
 import { Router } from '@angular/router';
+import { AuthResponse } from './auth/auth-response.interface';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
@@ -50,10 +51,11 @@ export class AuthInterceptor implements HttpInterceptor {
       this.isRefreshing = true;
       
       return this.authService.refreshToken().pipe(
-        switchMap((token: any) => {
-          this.isRefreshing = false;
-          return next.handle(this.addToken(request, token));
-        }),
+        switchMap((response: AuthResponse) => {
+          const newToken = response.token;
+          return next.handle(this.addToken(request, newToken));
+        })
+        ,
         catchError(error => {
           this.isRefreshing = false;
           this.authService.logout();

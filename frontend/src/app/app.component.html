@@ -1,38 +1,4 @@
-<div *ngIf="isLoading" class="loading-overlay">
-   <div class="spinner-border text-primary" role="status">
-     <span class="sr-only">Loading...</span>
-   </div>
- </div>
- 
+<router-outlet></router-outlet>
 
- <div *ngIf="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
-   {{ errorMessage }}
-   <button type="button" class="close" (click)="errorMessage = null" aria-label="Close">
-     <span aria-hidden="true">&times;</span>
-   </button>
- </div>
- 
- <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  
- </nav>
- 
- <div class="container" id="main-container">
-   <div class="row">
-     <div *ngFor="let employee of filteredEmployees" class="col-md-6 col-xl-3">
-   
-     </div>
-   </div>
- 
-   
-   <div *ngIf="filteredEmployees.length === 0 && !isLoading" class="col-12 mt-4">
-     <div class="alert alert-info" role="alert">
-       <h4 class="alert-heading">No Employees Found</h4>
-       <p *ngIf="searchKey">No employees match your search for "{{searchKey}}"</p>
-       <p *ngIf="!searchKey">The employee list is currently empty.</p>
-       <hr>
-       <p class="mb-0">Click "Add Employee" to create a new employee record.</p>
-     </div>
-   </div>
- 
-   
- </div>
+
+

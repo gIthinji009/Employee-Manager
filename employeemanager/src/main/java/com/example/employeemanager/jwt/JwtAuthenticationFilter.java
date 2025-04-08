@@ -14,8 +14,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -32,7 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        return path.equals("/api/auth/register") || path.equals("/api/auth/login"); // Ensures login is also excluded
+        return path.equals("/api/auth/register") || path.equals("/api/auth/login");
     }
 
     @Override
@@ -68,15 +69,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-        if (!jwtUtil.validateToken(jwt, userDetails)) {
+        if (!jwtUtil.validateToken(jwt)) {
             throw new JwtValidationException("Invalid or expired JWT token");
         }
 
         UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities()
+                );
 
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 
@@ -111,7 +115,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     "path": "%s",
                     "timestamp": "%s"
                 }""",
-                        status, error, message, request.getServletPath(), java.time.LocalDateTime.now())
+                        status, error, message, request.getServletPath(), LocalDateTime.now())
         );
     }
 
