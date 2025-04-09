@@ -53,7 +53,10 @@ export class AuthGuard implements CanActivate {
 
     while (currentRoute) {
       if (currentRoute.data['roles']) {
-        roles.push(...currentRoute.data['roles']);
+        const routeRoles = Array.isArray(currentRoute.data['roles']) 
+          ? currentRoute.data['roles'] 
+          : [currentRoute.data['roles']];
+        roles.push(...routeRoles);
       }
       currentRoute = currentRoute.parent;
     }

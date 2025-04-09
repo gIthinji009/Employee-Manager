@@ -24,12 +24,19 @@ export class AppComponent implements OnInit {
   public isLoading = true;
   public errorMessage: string | null = null;
 
+  public isAdmin = false;
+  public isUser = false;
+
   constructor(
     private employeeService: EmployeeService,
     private authService: AuthService
   ) {}
 
   ngOnInit(): void {
+    this.authService.currentRoles$.subscribe(roles => {
+      this.isAdmin = roles.includes('ROLE_ADMIN');
+      this.isUser = roles.includes('ROLE_USER');
+    });
     this.checkAuthAndLoadData();
   }
 

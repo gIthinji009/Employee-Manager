@@ -3,10 +3,9 @@ import { AppComponent } from './app/app.component';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { routes } from './app/app-routing.module';
-import { jwtInterceptor } from './app/shared/jwt.interceptor'; // Changed to functional interceptor
+import {jwtInterceptor } from './app/shared/jwt.interceptor'; // Changed to functional interceptor
 import { importProvidersFrom } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-// import { AuthInterceptor } from '../src/app/auth.interceptor';
 import { JwtHelperService, JWT_OPTIONS } from '@auth0/angular-jwt';
 
 

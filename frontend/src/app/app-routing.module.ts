@@ -17,19 +17,19 @@ export const routes: Routes = [
     path: 'employees', 
     component: EmployeeListComponent,
     canActivate: [AuthGuard],
-    data: { roles: ['USER', 'MANAGER', 'ADMIN'] }
+    data: { roles: ['USER', 'ADMIN'] }
   },
   { 
     path: 'employees/add', 
     component: EmployeeFormComponent,
     canActivate: [AuthGuard, RoleGuard],
-    data: { roles: ['MANAGER', 'ADMIN'] }
+    data: { roles: ['ADMIN'] }
   },
   { 
     path: 'employees/edit/:id', 
     component: EmployeeFormComponent,
     canActivate: [AuthGuard, RoleGuard],
-    data: { roles: ['MANAGER', 'ADMIN'] }
+    data: { roles: [ 'ADMIN'] }
   },
  
   { path: 'unauthorized', component: UnauthorizedComponent },
