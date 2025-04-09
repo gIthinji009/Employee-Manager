@@ -4,23 +4,35 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import java.security.Key;
 import java.util.Date;
+import java.util.List;
 import java.util.function.Function;
 import java.nio.charset.StandardCharsets;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtUtil {
-    private final Key SECRET_KEY;
-    private final long EXPIRATION_TIME;
+
+    private final Key accessTokenSecret;
+    private final Key refreshTokenSecret;
+    private final long accessTokenExpiration;
+    private final long refreshTokenExpiration;
 
     public JwtUtil(
-            @Value("${jwt.secret}") String secret,
-            @Value("${jwt.expiration}") long expirationTime) {
-        this.SECRET_KEY = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.EXPIRATION_TIME = expirationTime;
+            @Value("${jwt.secret.access}") String accessSecret,
+            @Value("${jwt.secret.refresh}") String refreshSecret,
+            @Value("${jwt.expiration.access}") long accessTokenExpiration,
+            @Value("${jwt.expiration.refresh}") long refreshTokenExpiration)
+    {
+        this.accessTokenSecret = Keys.hmacShaKeyFor(accessSecret.getBytes());
+        this.refreshTokenSecret = Keys.hmacShaKeyFor(refreshSecret.getBytes());
+        this.accessTokenExpiration = accessTokenExpiration;
+        this.refreshTokenExpiration = refreshTokenExpiration;
+
     }
 
     public String extractUsername(String token) {
@@ -40,7 +52,7 @@ public class JwtUtil {
     private Claims extractAllClaims(String token) {
         try {
             return Jwts.parserBuilder()
-                    .setSigningKey(SECRET_KEY)
+                    .setSigningKey(accessTokenSecret)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
@@ -57,14 +69,14 @@ public class JwtUtil {
         }
     }
 
-    public boolean validateToken(String token) {
+    public boolean validateToken(String token, boolean isAccessToken) {
         try {
             Jwts.parserBuilder()
-                    .setSigningKey(SECRET_KEY)
+                    .setSigningKey(isAccessToken ? accessTokenSecret : refreshTokenSecret)
                     .build()
                     .parseClaimsJws(token);
-            return !isTokenExpired(token);
-        } catch (Exception e) {
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }
@@ -72,13 +84,38 @@ public class JwtUtil {
     public boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
+    public String generateAccessToken(UserDetails userDetails) {
+        return buildToken(userDetails, accessTokenSecret, accessTokenExpiration);
+    }
 
-    public String generateToken(UserDetails userDetails) {
+    public String generateRefreshToken(UserDetails userDetails) {
+        return buildToken(userDetails, refreshTokenSecret, refreshTokenExpiration);
+    }
+    private String buildToken(UserDetails userDetails, Key secret, long expiration) {
         return Jwts.builder()
                 .setSubject(userDetails.getUsername())
+                .claim("roles", getRoles(userDetails))
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-                .signWith(SECRET_KEY)
+                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(secret, SignatureAlgorithm.HS256)
                 .compact();
     }
+    private List<String> getRoles(UserDetails userDetails) {
+        return userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+    }
+
+    public String generateToken(UserDetails userDetails) {
+        return buildToken(userDetails, accessTokenSecret, accessTokenExpiration);
+    }
+    public String getUsernameFromToken(String token, boolean isAccessToken) {
+        return Jwts.parserBuilder()
+                .setSigningKey(isAccessToken ? accessTokenSecret : refreshTokenSecret)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+    }
+
 }

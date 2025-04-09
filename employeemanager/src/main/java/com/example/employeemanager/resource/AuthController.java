@@ -2,9 +2,12 @@ package com.example.employeemanager.resource;
 
 import com.example.employeemanager.dto.LoginRequest;
 import com.example.employeemanager.dto.RegisterRequest;
+import com.example.employeemanager.jwt.JwtUtil;
 import com.example.employeemanager.model.User;
 import com.example.employeemanager.repo.UserRepo;
-import com.example.employeemanager.jwt.JwtUtil;
+import com.example.employeemanager.service.RefreshTokenService;
+import com.example.employeemanager.model.RefreshToken;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -12,40 +15,52 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
 
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
 @Tag(name = "Authentication", description = "User authentication and registration endpoints")
 public class AuthController {
+
     private final UserRepo userRepo;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
+    private final RefreshTokenService refreshTokenService;
 
-    public AuthController(UserRepo userRepo, PasswordEncoder passwordEncoder,
-                          AuthenticationManager authenticationManager, JwtUtil jwtUtil,
-                          UserDetailsService userDetailsService) {
+    public AuthController(UserRepo userRepo,
+                          PasswordEncoder passwordEncoder,
+                          AuthenticationManager authenticationManager,
+                          JwtUtil jwtUtil,
+                          UserDetailsService userDetailsService,
+                          RefreshTokenService refreshTokenService) {
         this.userRepo = userRepo;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Operation(summary = "Register a new user", description = "Creates a new user account")
@@ -76,7 +91,7 @@ public class AuthController {
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole()))
         );
 
-        String token = jwtUtil.generateToken(userDetails);
+        String token = jwtUtil.generateAccessToken(userDetails);
 
         return ResponseEntity.ok(Map.of(
                 "message", "User registered successfully",
@@ -103,11 +118,16 @@ public class AuthController {
             );
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            String token = jwtUtil.generateToken(userDetails);
+            String token = jwtUtil.generateAccessToken(userDetails);
+
+            var roles = userDetails.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .collect(Collectors.toList());
 
             return ResponseEntity.ok(Map.of(
                     "token", token,
-                    "username", userDetails.getUsername()
+                    "username", userDetails.getUsername(),
+                    "roles", roles
             ));
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(401).body(Map.of("error", "Invalid credentials"));
@@ -117,5 +137,51 @@ public class AuthController {
                     "message", e.getMessage()
             ));
         }
+    }
+
+    @Operation(summary = "Refresh access token", description = "Uses refresh token to get new access token")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Token refreshed successfully",
+                    content = @Content(schema = @Schema(implementation = Map.class),
+                            examples = @ExampleObject(value = "{\"token\": \"newAccessToken\", \"refreshToken\": \"sameOrNewRefreshToken\"}"))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - invalid or expired refresh token")
+    })
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refreshToken(HttpServletRequest request) {
+        String requestToken = getTokenFromRequest(request);
+
+        if (requestToken == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Missing refresh token"));
+        }
+
+        return refreshTokenService.findByToken(requestToken)
+                .map(refreshToken -> {
+                    if (refreshTokenService.isExpired(refreshToken)) {
+                        refreshTokenService.deleteByUser(refreshToken.getUser());
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                .body(Map.of("error", "Refresh token expired"));
+                    }
+
+                    UserDetails userDetails = userDetailsService
+                            .loadUserByUsername(refreshToken.getUser().getUsername());
+
+                    String newAccessToken = jwtUtil.generateAccessToken(userDetails);
+
+                    return ResponseEntity.ok(Map.of(
+                            "token", newAccessToken,
+                            "refreshToken", requestToken
+                    ));
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Invalid refresh token")));
+    }
+
+    private String getTokenFromRequest(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+        return null;
     }
 }
